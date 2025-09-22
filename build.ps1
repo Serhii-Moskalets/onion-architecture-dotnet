@@ -1,4 +1,4 @@
-. .\BuildFunctions.ps1
+. "$PSScriptRoot\BuildFunctions.ps1"
 $startTime = 
 $projectName = "Church Bulletin"
 $base_dir = resolve-path .\
@@ -12,6 +12,15 @@ $verbosity = "m"
 
 $build_dir = "$base_dir\build"
 $test_dir = "$build_dir\test"
+
+$aliaSql = "$source_dir\Database\scripts\AliaSql.exe"
+$databaseAction = $env:DatabaseAction
+if ([string]::IsNullOrEmpty($databaseAction)) { $databaseAction = "Rebuild"}
+$databaseName = $env:DatabaseName
+if ([string]::IsNullOrEmpty($databaseName)) { $databaseName = $projectName}
+$script:databaseServer = $env:DatabaseServer
+if ([string]::IsNullOrEmpty($script:databaseServer)) { $script:databaseServer = "(LocalDb)\MSSQLLocalDB"}
+$databaseScripts = "$source_dir\Database\scripts"
 
 if ([string]::IsNullOrEmpty($version)) { $version = "1.0.0.0"}
 if ([string]::IsNullOrEmpty($projectConfig)) {$projectConfig = "Release"}
@@ -75,6 +84,11 @@ Function IntegrationTest{
 	}
 }
 
+Function MigrationDatabaseLocal {
+	exec {
+		& $aliaSql $databaseAction $script:databaseServer $databaseName $databaseScripts
+	}
+}
 
 Function PrivateBuild{
 	$projectConfig = "Debug"
@@ -82,12 +96,12 @@ Function PrivateBuild{
 	Init
 	Compile
 	UnitTests
+	MigrationDatabaseLocal
+	IntegrationTest
 	$sw.Stop()
 	write-host "Build time: " $sw.Elapsed.ToString()
 }
 
 Function CIBuild{
-	Init
-	Compile
-	UnitTests
+	PrivateBuild
 }
